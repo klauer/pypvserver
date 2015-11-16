@@ -6,36 +6,36 @@ from __future__ import print_function
 import time
 
 import config
+from config import logger
 
 from pypvserver import CasPV
 import epics
 
 
+def updated(value=None, **kwargs):
+    logger.info('pyepics client sees new value: %s', value)
+
+
 def test():
-    loggers = ('pypvserver',
-               )
-
-    config.setup_loggers(loggers)
-
-    session = config.session
-    server = session.cas
-
-    def updated(value=None, **kwargs):
-        print('Updated to: %s' % value)
-
-    python_pv = CasPV(config.server_pvnames[0], 123.0, server=server)
+    server = config.get_server()
+    logger.info('Creating PV "pv1", a floating-point type')
+    python_pv = CasPV('pv1', 123.0, server=server)
 
     # full_pvname includes the server prefix
     pvname = python_pv.full_pvname
+    logger.info('... which is %s including the server prefix', pvname)
 
     signal = epics.PV(pvname)
     signal.add_callback(updated)
 
     time.sleep(0.1)
 
-    for i in range(10):
-        python_pv.value = i
+    for value in range(10):
+        logger.info('Updating the value on the server-side to: %s', value)
+        python_pv.value = value
         time.sleep(0.05)
+
+    logger.info('Done')
 
 
 if __name__ == '__main__':

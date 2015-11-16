@@ -1,4 +1,4 @@
-from .alarms import MinorAlarmError, get_alarm_class, DisconnectedError
+from .alarms import MinorAlarmError, get_alarm_class
 
 __all__ = ['split_record_field',
            'strip_field',

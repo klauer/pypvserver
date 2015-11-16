@@ -16,7 +16,7 @@ import numpy as np
 from pcaspy import cas
 
 from .utils import split_record_field
-from .errors import casPVNotFoundError
+from .errors import PVNotFoundError
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ def patch_swig(mod):
 patch_swig(cas)
 
 
-class caServer(cas.caServer):
+class PypvServer(cas.caServer):
     '''Channel Access Server
 
     Parameters
@@ -97,8 +97,8 @@ class caServer(cas.caServer):
         if start:
             self.start()
 
-        if default and caServer.default_instance is None:
-            caServer.default_instance = self
+        if default and PypvServer.default_instance is None:
+            PypvServer.default_instance = self
 
             self._attach_cas_functions()
 
@@ -106,13 +106,13 @@ class caServer(cas.caServer):
     #  cas.asCaStop()
 
     def _attach_cas_functions(self):
-        from . import CasFunction
+        from . import PypvFunction
 
-        for fcn in list(CasFunction._to_attach):
+        for fcn in list(PypvFunction._to_attach):
             if fcn._server is None:
                 fcn.attach_server(self)
 
-        del CasFunction._to_attach[:]
+        del PypvFunction._to_attach[:]
 
     def _get_prefix(self):
         '''The channel access prefix, shared by all PVs added to this server.'''
@@ -187,7 +187,7 @@ class caServer(cas.caServer):
         try:
             pvi = self.get_pv(pvname)
         except KeyError:
-            return casPVNotFoundError.ret
+            return PVNotFoundError.ret
 
         logger.debug('PV attach %s' % (pvname, ))
         return pvi

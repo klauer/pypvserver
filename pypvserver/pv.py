@@ -4,7 +4,8 @@
 ====================================================
 
 .. module:: pypvserver.pv
-   :synopsis: Epics process variables used in the channel access server, :class:`caServer`
+   :synopsis: Epics process variables used in the channel access server,
+              :class:`PypvServer`
 '''
 
 from __future__ import print_function
@@ -19,9 +20,9 @@ from pcaspy import cas
 from .alarms import (AlarmError, MajorAlarmError, MinorAlarmError, alarms)
 from .utils import record_field
 
-from .server import caServer
-from .errors import (casAsyncCompletion, casAsyncRunning, casError, casSuccess,
-                     casUndefinedValueError)
+from .server import PypvServer
+from .errors import (AsyncCompletion, AsyncRunning, PypvError, PypvSuccess,
+                     UndefinedValueError)
 
 
 logger = logging.getLogger(__name__)
@@ -106,7 +107,7 @@ class Limits(object):
                                       alarm=alarms.LOW_ALARM)
 
 
-class CasPV(cas.casPV):
+class PyPV(cas.casPV):
     '''Channel access server process variable
 
     Parameters
@@ -139,7 +140,7 @@ class CasPV(cas.casPV):
     scan_cb : callable, optional
         A callback called when the scan event happens -- when the PV should have
         its value updated. This overrides the default `scan` method.
-    server : caServer, optional
+    server : PypvServer, optional
         The channel access server to attach to
 
     Attributes
@@ -188,7 +189,7 @@ class CasPV(cas.casPV):
             name = server._strip_prefix(name)
 
         self._name = str(name)
-        self._ca_type = caServer.type_map.get(type_, type_)
+        self._ca_type = PypvServer.type_map.get(type_, type_)
         self._precision = precision
         self._units = str(units)
         self._scan_rate = float(scan)
@@ -214,9 +215,9 @@ class CasPV(cas.casPV):
         self._severity = AlarmError.severity
         self._updating = False
 
-        if count == 0 and self._ca_type in caServer.numerical_types:
+        if count == 0 and self._ca_type in PypvServer.numerical_types:
             alarm_fcn = self._check_numerical
-        elif self._ca_type in caServer.enum_types:
+        elif self._ca_type in PypvServer.enum_types:
             if type_ is bool:
                 self._enums = ['False', 'True']
                 self._value = self._enums[bool(value)]
@@ -232,11 +233,11 @@ class CasPV(cas.casPV):
 
             self.minor_states = list(minor_states)
             self.major_states = list(major_states)
-        elif self._ca_type in caServer.string_types:
+        elif self._ca_type in PypvServer.string_types:
             alarm_fcn = self._check_string
         elif count > 0 or (type_ is np.ndarray and isinstance(value, np.ndarray)):
             try:
-                self._ca_type = caServer.type_map[value.dtype.type]
+                self._ca_type = PypvServer.type_map[value.dtype.type]
             except KeyError:
                 raise ValueError('Unhandled numpy array type %s' % value.dtype)
 
@@ -478,7 +479,7 @@ class CasPV(cas.casPV):
                                    value=self._value,
                                    status=self._status,
                                    severity=self._severity)
-        except casAsyncCompletion:
+        except AsyncCompletion:
             while wait and self.hasAsyncWrite():
                 time.sleep(0.01)
 
@@ -495,24 +496,24 @@ class CasPV(cas.casPV):
             try:
                 info = self._gdd_to_dict(value)
                 self._written_cb(**info)
-            except casAsyncCompletion as ex:
+            except AsyncCompletion as ex:
                 if self.hasAsyncWrite():
-                    return casAsyncRunning.ret
+                    return AsyncRunning.ret
                 else:
                     self.startAsyncWrite(context)
                 return ex.ret
-            except casError as ex:
+            except PypvError as ex:
                 return ex.ret
             except Exception as ex:
                 logger.debug('written_cb failed: (%s) %s' % (ex.__class__.__name__, ex),
                              exc_info=ex)
                 # TODO: no error for rejected values?
-                return casSuccess.ret
+                return PypvSuccess.ret
 
         self.value = value
-        return casSuccess.ret
+        return PypvSuccess.ret
 
-    def async_done(self, ret=casSuccess.ret):
+    def async_done(self, ret=PypvSuccess.ret):
         '''Indicate to the server that the asynchronous write has completed'''
         if self.hasAsyncWrite():
             self.endAsyncWrite(ret)
@@ -534,7 +535,7 @@ class CasPV(cas.casPV):
             gdd.setPrimType(self._ca_type)
 
         if self._value is None:
-            raise casUndefinedValueError()
+            raise UndefinedValueError()
 
         gdd.put(self._value)
         gdd.setStatSevr(self._alarm, self._severity)
@@ -548,15 +549,15 @@ class CasPV(cas.casPV):
             '''Internal pcaspy function; do not use'''
             try:
                 ret = fcn(self, gdd, **kwargs)
-            except casError as ex:
-                logger.debug('caserror %s' % ex, exc_info=ex)
+            except PypvError as ex:
+                logger.debug('pypverror %s' % ex, exc_info=ex)
                 return ex.ret
             except Exception as ex:
                 logger.debug('gdd failed %s' % ex, exc_info=ex)
-                return casUndefinedValueError.ret
+                return UndefinedValueError.ret
 
             if ret is None:
-                return casSuccess.ret
+                return PypvSuccess.ret
 
             return ret
 
@@ -607,17 +608,17 @@ class CasPV(cas.casPV):
         return self._count
 
     def __repr__(self):
-        return 'CasPV({0.name!r}, value={0.value!r}, ' \
-               'alarm={0.alarm}, severity={0.severity})'.format(self)
+        return ('PyPV({0.name!r}, value={0.value!r}, '
+                'alarm={0.alarm}, severity={0.severity})'.format(self))
 
 
-class CasRecord(CasPV):
+class PypvRecord(PyPV):
     '''A channel access server record
 
     Starts out with just a VAL field. Additional fields can be added
     dynamically.
 
-    Keyword arguments are passed through to the base class, CasPV
+    Keyword arguments are passed through to the base class, PyPV
 
     Parameters
     ----------
@@ -633,7 +634,7 @@ class CasRecord(CasPV):
     Attributes
     ----------
     fields : dict
-        Field name to CasPV instance
+        Field name to PyPV instance
     '''
 
     def __init__(self, name, val_field, rtype=None,
@@ -641,7 +642,7 @@ class CasRecord(CasPV):
                  **kwargs):
         assert '.' not in name, 'Record name cannot have periods'
 
-        CasPV.__init__(self, name, val_field, **kwargs)
+        PyPV.__init__(self, name, val_field, **kwargs)
 
         self.fields = {}
         self.add_field('VAL', None, pv=self)
@@ -669,7 +670,7 @@ class CasRecord(CasPV):
         if pv is None:
             field_pv = self.field_pvname(field)
             kwargs.pop('server', '')
-            pv = CasPV(field_pv, value, **kwargs)
+            pv = PyPV(field_pv, value, **kwargs)
 
         self.fields[field] = pv
 

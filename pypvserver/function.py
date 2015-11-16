@@ -17,14 +17,14 @@ from collections import OrderedDict
 
 import epics
 
-from .pv import CasPV
-from .errors import casAsyncCompletion
-from . import caServer
+from .pv import PyPV
+from .errors import AsyncCompletion
+from . import PypvServer
 
 logger = logging.getLogger(__name__)
 
 
-class CasFunction(object):
+class PypvFunction(object):
     '''Channel Access Server function decorator
 
     RPC-like functionality via channel access for Python functions
@@ -33,7 +33,7 @@ class CasFunction(object):
     ----------
     prefix : str, optional
         The prefix to use (defaults to the function name)
-    server : caServer, optional
+    server : PypvServer, optional
         The channel access server to use (defaults to the currently running one,
         or the next instantiated one if not specified)
     async : bool, optional
@@ -54,7 +54,7 @@ class CasFunction(object):
     return_value : , optional
         Default value for the return value
     return_kwargs : , optional
-        Keyword arguments are passed to the return value CasPV initializer. You
+        Keyword arguments are passed to the return value PyPV initializer. You
         can then specify `count`, `type_`, etc. here
     '''
     _to_attach = []
@@ -68,8 +68,8 @@ class CasFunction(object):
                  **return_kwargs
                  ):
 
-        if server is None and caServer.default_instance is not None:
-            server = caServer.default_instance
+        if server is None and PypvServer.default_instance is not None:
+            server = PypvServer.default_instance
 
         self._prefix = str(prefix)
         self._server = server
@@ -94,7 +94,7 @@ class CasFunction(object):
 
         self._server = server
 
-        for name in self._functions.keys():
+        for name in list(self._functions.keys()):
             try:
                 self._add_fcn(name)
             except Exception as ex:
@@ -102,8 +102,8 @@ class CasFunction(object):
                 logger.error('Failed to add function: %s (%s)' % (name, ex), exc_info=ex)
                 del self._functions[name]
 
-        if self in CasFunction._to_attach:
-            CasFunction._to_attach.remove(self)
+        if self in PypvFunction._to_attach:
+            PypvFunction._to_attach.remove(self)
 
     def _add_fcn(self, name):
         '''Add a function to the list being handled.
@@ -113,9 +113,9 @@ class CasFunction(object):
         '''
         server = self._server
         if server is None:
-            # The next caServer created will attach to these functions
-            if self not in CasFunction._to_attach:
-                CasFunction._to_attach.append(self)
+            # The next PypvServer created will attach to these functions
+            if self not in PypvFunction._to_attach:
+                PypvFunction._to_attach.append(self)
 
             return
 
@@ -129,22 +129,22 @@ class CasFunction(object):
 
         pv_kw = {}
         if self._use_process:
-            proc_pv = CasPV(''.join((fcn_prefix, self._process_pv)), 0,
-                            written_cb=info['wrapped'])
+            proc_pv = PyPV(''.join((fcn_prefix, self._process_pv)), 0,
+                           written_cb=info['wrapped'])
         else:
             pv_kw['written_cb'] = info['wrapped']
             proc_pv = None
 
-        retval_pv = CasPV(''.join((fcn_prefix, self._retval_pv)),
-                          self._default_retval,
-                          **self._return_kwargs)
+        retval_pv = PyPV(''.join((fcn_prefix, self._retval_pv)),
+                         self._default_retval,
+                         **self._return_kwargs)
 
-        status_pv = CasPV(''.join((fcn_prefix, self._status_pv)),
-                          'status')
+        status_pv = PyPV(''.join((fcn_prefix, self._status_pv)),
+                         'status')
 
-        param_pvs = [CasPV(''.join((fcn_prefix, param)),
-                           default,
-                           **pv_kw)
+        param_pvs = [PyPV(''.join((fcn_prefix, param)),
+                          default,
+                          **pv_kw)
                      for param, default in zip(params, defaults)]
 
         added = []
@@ -286,7 +286,7 @@ class CasFunction(object):
         @functools.wraps(fcn)
         def wrapped_async(**cas_kw):
             self._run_async(name)
-            raise casAsyncCompletion()
+            raise AsyncCompletion()
 
         if self._async:
             wrapped = wrapped_async

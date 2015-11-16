@@ -9,34 +9,34 @@
 '''
 from pcaspy import cas
 
-__all__ = ['casError',
-           'casSuccess',
-           'casPVNotFoundError',
-           'casUndefinedValueError',
-           'casAsyncCompletion',
-           'casAsyncRunning',
+__all__ = ['PypvError',
+           'PypvSuccess',
+           'PVNotFoundError',
+           'UndefinedValueError',
+           'AsyncCompletion',
+           'AsyncRunning',
            ]
 
 
-class casError(Exception):
+class PypvError(Exception):
     ret = cas.S_casApp_success
 
 
-class casSuccess(casError):
+class PypvSuccess(PypvError):
     ret = cas.S_casApp_success
 
 
-class casPVNotFoundError(casError):
+class PVNotFoundError(PypvError):
     ret = cas.S_casApp_pvNotFound
 
 
-class casUndefinedValueError(casError):
+class UndefinedValueError(PypvError):
     ret = cas.S_casApp_undefined
 
 
-class casAsyncCompletion(casError):
+class AsyncCompletion(PypvError):
     ret = cas.S_casApp_asyncCompletion
 
 
-class casAsyncRunning(casError):
+class AsyncRunning(PypvError):
     ret = cas.S_casApp_postponeAsyncIO

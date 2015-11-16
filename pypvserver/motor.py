@@ -9,8 +9,8 @@
 
 from __future__ import print_function
 
-from .pv import CasRecord
-from .errors import casAsyncCompletion
+from .pv import PypvRecord
+from .errors import AsyncCompletion
 # from ophyd.positioner import (Positioner, )
 # from ophyd.pseudopos import (PseudoPositioner, )
 
@@ -33,11 +33,11 @@ STATUS_BITS = {'direction': 0,         # last raw direction; (0:Negative, 1:Posi
                }
 
 
-class CasMotor(CasRecord):
+class PypvMotor(PypvRecord):
     '''A fake EPICS motor record, made available to EPICS by the built-in
     channel access server.
 
-    Keyword arguments are passed to the base class, CasRecord
+    Keyword arguments are passed to the base class, PypvRecord
 
     Parameters
     ----------
@@ -75,13 +75,13 @@ class CasMotor(CasRecord):
         # elif isinstance(positioner, PseudoPositioner):
         #     if len(positioner.pseudos) > 1:
         #         raise ValueError('Cannot use with multiple-pseudo positioner. '
-        #                          'Instead, create CasMotors on individual axes.')
+        #                          'Instead, create PypvMotors on individual axes.')
 
         self._pos = positioner
         self._status = 0
 
-        CasRecord.__init__(self, name, self._pos.position,
-                           rtype=self._rtype, **kwargs)
+        PypvRecord.__init__(self, name, self._pos.position,
+                            rtype=self._rtype, **kwargs)
 
         self.add_field(self._fld_readback, self._pos.position)
         self.add_field(self._fld_egu, self._pos.egu)
@@ -115,7 +115,7 @@ class CasMotor(CasRecord):
             self._pos.move(value, wait=False,
                            moved_cb=lambda **kwargs: self.async_done())
 
-            raise casAsyncCompletion
+            raise AsyncCompletion()
 
     def _check_limits(self, pos):
         '''Check the position against the limits

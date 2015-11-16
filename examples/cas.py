@@ -8,7 +8,7 @@ import time
 import config
 from config import logger
 
-from pypvserver import CasPV
+from pypvserver import PyPV
 import epics
 
 
@@ -19,7 +19,7 @@ def updated(value=None, **kwargs):
 def test():
     server = config.get_server()
     logger.info('Creating PV "pv1", a floating-point type')
-    python_pv = CasPV('pv1', 123.0, server=server)
+    python_pv = PyPV('pv1', 123.0, server=server)
 
     # full_pvname includes the server prefix
     pvname = python_pv.full_pvname

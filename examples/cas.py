@@ -4,12 +4,15 @@ implementation based on pcaspy
 '''
 from __future__ import print_function
 import time
+import logging
 
-import config
-from config import logger
+import epics
 
 from pypvserver import PyPV
-import epics
+import config
+
+
+logger = logging.getLogger(__name__)
 
 
 def updated(value=None, **kwargs):
@@ -17,6 +20,7 @@ def updated(value=None, **kwargs):
 
 
 def test():
+    config.setup_logging([__name__, 'pypvserver.pv'])
     server = config.get_server()
     logger.info('Creating PV "pv1", a floating-point type')
     python_pv = PyPV('pv1', 123.0, server=server)

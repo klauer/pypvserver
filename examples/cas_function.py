@@ -5,15 +5,15 @@ access server)
 '''
 from __future__ import print_function
 import time
+import logging
 
+import epics
 import numpy as np
 
 from pypvserver import PypvFunction
-import epics
-
 import config
 
-logger = config.logger
+logger = logging.getLogger(__name__)
 
 
 @PypvFunction()
@@ -287,6 +287,7 @@ def test_bool():
 
 
 def test():
+    config.setup_logging([__name__, 'pypvserver.function'])
     server = config.get_server()
 
     test_async()

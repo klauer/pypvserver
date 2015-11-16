@@ -98,7 +98,6 @@ class PypvFunction(object):
             try:
                 self._add_fcn(name)
             except Exception as ex:
-                # print('Failed to add function: %s (%s)' % (name, ex))
                 logger.error('Failed to add function: %s (%s)' % (name, ex), exc_info=ex)
                 del self._functions[name]
 

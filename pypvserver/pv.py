@@ -225,9 +225,12 @@ class PyPV(cas.casPV):
                 self._enums = list(self._value)
                 self._value = self._value[0]
 
-            if np.array(self._value).dtype.type != np.string_:
-                raise ValueError('Enum list item types should be strings (specify an np.array'
-                                 ' as the value if you wanted a waveform)')
+            dtyp = np.array(self._value).dtype
+            if dtyp.type not in (np.string_, np.str_):
+                raise ValueError('Enum list item types should be strings '
+                                 '(specify an np.ndarray as the value if you '
+                                 'wanted a waveform). '
+                                 'value={} dtype={}'.format(self._value, dtyp))
 
             alarm_fcn = self._check_enum
 

@@ -182,7 +182,7 @@ class PypvMotor(PypvRecord):
         '''Update the motor status field (MSTA)'''
         old_status = self._status
 
-        for arg, value in kwargs.iteritems():
+        for arg, value in kwargs.items():
             bit = STATUS_BITS[arg]
             if value:
                 self._status |= (1 << bit)

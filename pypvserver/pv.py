@@ -15,6 +15,7 @@ import threading
 import logging
 
 import numpy as np
+import pcaspy
 from pcaspy import cas
 
 from .alarms import (AlarmError, MajorAlarmError, MinorAlarmError, alarms)
@@ -420,7 +421,10 @@ class PyPV(cas.casPV):
             self._gdd_set_value(gdd)
 
             # Notify clients of the update
-            self.postEvent(gdd)
+            if pcaspy.version_info >= (0, 6, 0):
+                self.postEvent(cas.DBE_VALUE, gdd)
+            else:
+                self.postEvent(gdd)
 
     value = property(_get_value, _set_value)
 
@@ -431,7 +435,7 @@ class PyPV(cas.casPV):
         '''
         # TODO this works on server side, pyepics doesn't handle it
         #      well though
-        raise NotImplementedError
+        raise NotImplementedError()
 
         if self._count <= 0:
             raise ValueError('Cannot resize a scalar PV')

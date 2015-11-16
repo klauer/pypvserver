@@ -81,7 +81,8 @@ class PypvServer(cas.caServer):
                 np.float64: cas.aitEnumFloat64,
                 }
 
-    string_types = (cas.aitEnumString, cas.aitEnumFixedString, cas.aitEnumUint8)
+    string_types = (cas.aitEnumString, cas.aitEnumFixedString,
+                    cas.aitEnumUint8)
     enum_types = (cas.aitEnumEnum16, )
     numerical_types = (cas.aitEnumFloat64, cas.aitEnumInt32)
     default_instance = None

@@ -1,25 +1,24 @@
 #!/usr/bin/env python2.7
-'''An example of using :class:`CasMotor`, which allows Ophyd :class:`Positioner`s
-to be accessed by EPICS, via the built-in channel access server.
+'''An example of using :class:`PypvMotor`, which allows Ophyd
+:class:`Positioner`s to be accessed by EPICS, via the built-in channel access
+server.
 '''
 from __future__ import print_function
 import epics
+import logging
 
 import config
 
-from pypvserver import CasMotor
+from pypvserver import PypvMotor
 from ophyd.controls import (EpicsMotor, PVPositioner)
 
 
+logger = logging.getLogger(__name__)
+
+
 def test():
-    loggers = ('pypvserver',
-               )
-
-    config.setup_loggers(loggers)
-
-    logger = config.logger
-    session = config.session
-    server = session.cas
+    config.setup_logging([__name__, 'pypvserver.motor'])
+    server = config.get_server()
 
     motor_record = config.motor_recs[0]
     mrec = EpicsMotor(motor_record)
@@ -38,14 +37,14 @@ def test():
     def updated(value=None, **kwargs):
         print('Updated to: %s' % value)
 
-    cas_motor = CasMotor('m1', pos, server=server)
-    print(cas_motor.severity)
-    record_name = cas_motor.full_pvname
+    ppv_motor = PypvMotor('m1', pos, server=server)
+    print(ppv_motor.severity)
+    record_name = ppv_motor.full_pvname
     for i in range(2):
         epics.caput(record_name, i, wait=True)
         print(pos.position)
-    return cas_motor
+    return ppv_motor
 
 
 if __name__ == '__main__':
-    cas_motor = test()
+    ppv_motor = test()

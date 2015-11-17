@@ -9,20 +9,19 @@ from numpy.testing import assert_array_equal
 
 import epics
 
-from ophyd.controls.cas import (caServer, CasPV, CasRecord,
-                                Limits, logger, casAsyncCompletion)
-
-from ophyd.utils.errors import alarms
-from ophyd.utils.epics_pvs import record_field
+from pypvserver import (PypvServer, PyPV, PypvRecord, Limits, AsyncCompletion)
+from pypvserver.alarms import alarms
+from pypvserver.utils import record_field
 
 
 server = None
+logger = logging.getLogger(__name__)
 
 
 def setUpModule():
     global server
 
-    server = caServer('')
+    server = PypvServer('')
     server._pv_idx = 0
 
 
@@ -62,7 +61,7 @@ class CASTests(unittest.TestCase):
         limits = Limits(lolo=0.1, low=0.2, high=0.4, hihi=0.5)
 
         # pvs = server, pvc = client
-        pvs = CasPV(pv_name, 0.0, limits=limits,
+        pvs = PyPV(pv_name, 0.0, limits=limits,
                     units='test', server=server)
         pvc = client_pv(pv_name)
 
@@ -82,7 +81,7 @@ class CASTests(unittest.TestCase):
 
     def test_string(self):
         pv_name = get_pvname()
-        pvs = CasPV(pv_name, 'test', units='test')
+        pvs = PyPV(pv_name, 'test', units='test')
         server.add_pv(pvs)
 
         pvc = client_pv(pv_name)
@@ -97,7 +96,7 @@ class CASTests(unittest.TestCase):
 
     def test_enum(self):
         pv_name = get_pvname()
-        pvs = CasPV(pv_name, ['a', 'b', 'c'], units='test',
+        pvs = PyPV(pv_name, ['a', 'b', 'c'], units='test',
                     minor_states=['a'],
                     major_states=['c'])
 
@@ -115,7 +114,7 @@ class CASTests(unittest.TestCase):
             logger.debug('written_to-> %s' % kwargs)
 
         pv_name = get_pvname()
-        pvs = CasPV(pv_name, 0.0, server=server,
+        pvs = PyPV(pv_name, 0.0, server=server,
                     written_cb=written_to)
         pvc = client_pv(pv_name)
 
@@ -125,10 +124,12 @@ class CASTests(unittest.TestCase):
 
         def written_to_async(timestamp=None, value=None,
                              status=None, severity=None):
-            raise casAsyncCompletion
+            raise AsyncCompletion()
+
 
         def finished(**kwargs):
             logger.debug('caput completed', kwargs)
+
 
         pvs._written_cb = written_to_async
         pvc.put(12, wait=False, use_complete=True, callback=finished)
@@ -141,7 +142,7 @@ class CASTests(unittest.TestCase):
     def test_numpy(self):
         pv_name = get_pvname()
         arr = np.arange(10)
-        pvs = CasPV(pv_name, arr, server=server)
+        pvs = PyPV(pv_name, arr, server=server)
         pvc = client_pv(pv_name)
 
         pvs[1:4] = 4
@@ -165,7 +166,7 @@ class CASTests(unittest.TestCase):
         egu_field = record_field(record, 'EGU')
 
         arr = np.arange(10)
-        pvs = CasRecord(record, arr)
+        pvs = PypvRecord(record, arr)
         pvs.add_field('EGU', 'testing')
 
         server.add_pv(pvs)

@@ -11,6 +11,7 @@ from __future__ import print_function
 
 import threading
 import logging
+import sys
 
 import numpy as np
 from pcaspy import cas
@@ -172,17 +173,23 @@ class PypvServer(cas.caServer):
         else:
             return pvname
 
-    def pvExistTest(self, context, addr, pvname):
+    def __contains__(self, pvname):
         if not pvname.startswith(self._prefix):
-            return cas.pverDoesNotExistHere
+            return False
 
         try:
             self.get_pv(pvname)
         except KeyError:
-            return cas.pverDoesNotExistHere
+            return False
         else:
+            return True
+
+    def pvExistTest(self, context, addr, pvname):
+        if pvname in self:
             logger.debug('Responded %s exists' % pvname)
             return cas.pverExistsHere
+        else:
+            return cas.pverDoesNotExistHere
 
     def pvAttach(self, context, pvname):
         try:
@@ -218,9 +225,30 @@ class PypvServer(cas.caServer):
     def running(self):
         return self._running
 
-    def stop(self, wait=True):
+    def _pyepics_cleanup(self):
+        '''Selectively disconnect pyepics PVs if they exist on this server
+
+        This is a necessary clean-up step when using pyepics as a client in
+        the same process as the server.
+        '''
+        if 'epics.pv' not in sys.modules:
+            logger.debug('Not using pyepics')
+            return
+
+        import epics.pv
+        pvs = [pv for pv in epics.pv._PVcache_.values()
+               if pv.pvname in self]
+
+        for pv in pvs:
+            logger.debug('Disconnecting %s', pv)
+            pv.disconnect()
+
+    def stop(self, wait=True, client_cleanup=True):
         if self._running:
             self._running = False
+
+            if client_cleanup:
+                self._pyepics_cleanup()
 
             if wait:
                 self._thread.join()

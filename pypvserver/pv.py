@@ -197,6 +197,8 @@ class PyPV(cas.casPV):
         self.scan = scan_cb
         self._written_cb = written_cb
         self._count = 0
+        self._interest = False
+        self._mask = cas.DBE_VALUE | cas.DBE_LOG
 
         count = max(count, 0)
 
@@ -225,6 +227,8 @@ class PyPV(cas.casPV):
             else:
                 self._enums = list(self._value)
                 self._value = self._value[0]
+
+            self._mask |= cas.DBE_PROPERTY
 
             dtyp = np.array(self._value).dtype
             if dtyp.type not in (np.string_, np.str_):
@@ -418,13 +422,14 @@ class PyPV(cas.casPV):
             self._value = value
             self._status, self._severity = self.check_alarm()
 
+            if not self._interest:
+                return
+
             self._gdd_set_value(gdd)
 
             # Notify clients of the update
-            if pcaspy.version_info >= (0, 6, 0):
-                self.postEvent(cas.DBE_VALUE, gdd)
-            else:
-                self.postEvent(gdd)
+            self.postEvent(self._mask, gdd)
+            self._mask = cas.DBE_VALUE | cas.DBE_LOG
 
     value = property(_get_value, _set_value)
 
@@ -462,7 +467,7 @@ class PyPV(cas.casPV):
 
         Raises
         ------
-        casAsyncCompletion (when asynchronous completion is desired)
+        AsyncCompletion (when asynchronous completion is desired)
         '''
         pass
 
@@ -477,6 +482,14 @@ class PyPV(cas.casPV):
         (acts like an epics.PV, otherwise just use pv.value = value)
         '''
         self.value = value
+
+    def interestRegister(self, *args):
+        self._interest = True
+        return PypvSuccess.ret
+
+    def interestDelete(self, *args):
+        self._interest = False
+        return PypvSuccess.ret
 
     def process(self, wait=True):
         '''Cause the written-to callback to be fired'''
@@ -532,7 +545,7 @@ class PyPV(cas.casPV):
         '''
         if self.hasAsyncWrite():
             # Another async task currently running
-            return casAsyncRunning.ret
+            return AsyncRunning.ret
 
         return self.write(context, value)
 
@@ -574,7 +587,7 @@ class PyPV(cas.casPV):
         '''Set the gdd value to (some attribute of this instance)'''
         try:
             value = getattr(self, attr)
-        except:
+        except Exception:
             pass
         else:
             gdd.put(value)
@@ -583,12 +596,13 @@ class PyPV(cas.casPV):
         '''Set the gdd value to (some part of the limits)'''
         try:
             value = getattr(self.limits, attr)
-        except:
+        except Exception:
             pass
         else:
             gdd.put(value)
 
     getValue = _gdd_function(_gdd_set_value)
+    getClass = _gdd_function(_gdd_attr, attr='_class')
     getPrecision = _gdd_function(_gdd_attr, attr='_precision')
     getHighLimit = _gdd_function(_gdd_lim, attr='hilim')
     getLowLimit = _gdd_function(_gdd_lim, attr='lolim')
@@ -684,3 +698,10 @@ class PypvRecord(PyPV):
     def __repr__(self):
         return '{0}({1.name!r}, value={1.value!r}, alarm={1.alarm}, ' \
                'severity={1.severity})'.format(self.__class__.__name__, self)
+
+    def interestRegister(self, *args):
+        self._interest = True
+        return PypvSuccess.ret
+
+    def interestDelete(self, *args):
+        self._interest = False

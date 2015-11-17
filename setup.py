@@ -19,7 +19,7 @@ setup(name='pypvserver',
       url="https://github.com/klauer/pypvserver",
       packages=['pypvserver'],
       # package_data={'pypvserver': ['files/*']},
-      install_requires=['numpy', 'pcaspy'],
+      install_requires=['numpy', 'pcaspy>=0.6.0'],
       classifiers=[
           "Development Status :: 3 - Alpha",
           "Programming Language :: Python :: 2.7",

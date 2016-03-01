@@ -65,22 +65,26 @@ class PypvMotor(PypvRecord):
     _fld_limit_viol = 'LVIO'
 
     def __init__(self, name, positioner, tweak_value=1.0, timeout=10.0,
-                 **kwargs):
+                 desc=None, **kwargs):
 
         self._pos = positioner
         self._status = 0
         self._timeout = timeout
 
-        PypvRecord.__init__(self, name, self._pos.position, rtype=self._rtype,
-                            **kwargs)
+        if desc is None:
+            desc = positioner.name
 
-        self.add_field(self._fld_readback, self._pos.position)
+        PypvRecord.__init__(self, name, self._pos.position, rtype=self._rtype,
+                            desc=desc, **kwargs)
+
+        self.add_field(self._fld_readback, self._pos.position,
+                       precision=self._precision)
         self.add_field(self._fld_egu, self._pos.egu)
         self.add_field(self._fld_tweak_val, tweak_value)
         self.add_field(self._fld_tweak_fwd, 0, written_cb=self.tweak_forward)
         self.add_field(self._fld_tweak_rev, 0, written_cb=self.tweak_reverse)
         self.add_field(self._fld_stop, 0,
-                       written_cb=lambda **kwargs: self._pos.stop())
+                       written_cb=lambda **kwargs: self.stop())
         self.add_field(self._fld_moving, False)
         self.add_field(self._fld_done_move, True)
         self.add_field(self._fld_status, 0)
@@ -183,6 +187,10 @@ class PypvMotor(PypvRecord):
             pass
         else:
             self.move_status = None
+
+    def stop(self):
+        '''Stop the positioner'''
+        self._pos.stop()
 
     def _update_status(self, **kwargs):
         '''Update the motor status field (MSTA)'''

@@ -64,47 +64,46 @@ class PypvMotor(PypvRecord):
     _fld_calib_set = 'SET'
     _fld_limit_viol = 'LVIO'
 
-    def __init__(self, name, positioner,
-                 tweak_value=1.0,
-                 **kwargs):
-
-        # TODO: for now, just assume positioner acts like a positioner or a
-        #       pseudopositioner as to not make ophyd a dependency
-        # if not isinstance(positioner, Positioner):
-        #     raise ValueError('The positioner must be derived from Positioner')
-        # elif isinstance(positioner, PseudoPositioner):
-        #     if len(positioner.pseudos) > 1:
-        #         raise ValueError('Cannot use with multiple-pseudo positioner. '
-        #                          'Instead, create PypvMotors on individual axes.')
+    def __init__(self, name, positioner, tweak_value=1.0, timeout=10.0,
+                 desc=None, **kwargs):
 
         self._pos = positioner
         self._status = 0
+        self._timeout = timeout
 
-        PypvRecord.__init__(self, name, self._pos.position,
-                            rtype=self._rtype, **kwargs)
+        if desc is None:
+            desc = positioner.name
 
-        self.add_field(self._fld_readback, self._pos.position)
+        PypvRecord.__init__(self, name, self._pos.position, rtype=self._rtype,
+                            desc=desc, **kwargs)
+
+        self.add_field(self._fld_readback, self._pos.position,
+                       precision=self._precision)
         self.add_field(self._fld_egu, self._pos.egu)
         self.add_field(self._fld_tweak_val, tweak_value)
         self.add_field(self._fld_tweak_fwd, 0, written_cb=self.tweak_forward)
         self.add_field(self._fld_tweak_rev, 0, written_cb=self.tweak_reverse)
-        self.add_field(self._fld_stop, 0, written_cb=lambda **kwargs: self._pos.stop())
-        self.add_field(self._fld_moving, self._pos.moving)
-        self.add_field(self._fld_done_move, not self._pos.moving)
+        self.add_field(self._fld_stop, 0,
+                       written_cb=lambda **kwargs: self.stop())
+        self.add_field(self._fld_moving, False)
+        self.add_field(self._fld_done_move, True)
         self.add_field(self._fld_status, 0)
         self.add_field(self._fld_low_lim, 0)
         self.add_field(self._fld_high_lim, 0)
         self.add_field(self._fld_calib_set, 0)
         self.add_field(self._fld_limit_viol, 0)
 
-        self._pos.subscribe(self._readback_updated, event_type=self._pos.SUB_READBACK)
-        self._pos.subscribe(self._move_started, event_type=self._pos.SUB_START)
-        self._pos.subscribe(self._move_done, event_type=self._pos.SUB_DONE)
+        # self._pos.subscribe(self._move_started, event_type=self._pos.SUB_START,
+        #                     run=False)
+        # self._pos.subscribe(self._move_done, event_type=self._pos.SUB_DONE,
+        #                     run=False)
+        self._pos.subscribe(self._readback_updated,
+                            event_type=self._pos.SUB_READBACK)
 
-        self._update_status(moving=self._pos.moving)
+        self._update_status(moving=0)
 
-    def written_to(self, timestamp=None, value=None,
-                   status=None, severity=None):
+    def written_to(self, timestamp=None, value=None, status=None,
+                   severity=None):
         '''[CAS callback] CA client requested a move by writing to this record
         (or .VAL)
         '''
@@ -112,9 +111,12 @@ class PypvMotor(PypvRecord):
             return
 
         if self._check_limits(value):
-            self._pos.move(value, wait=False,
-                           moved_cb=lambda **kwargs: self.async_done())
+            self._move_started()
+            st = self._pos.move(value, wait=False, timeout=self._timeout,
+                                moved_cb=self._move_done,
+                                )
 
+            self.move_status = st
             raise AsyncCompletion()
 
     def _check_limits(self, pos):
@@ -154,7 +156,8 @@ class PypvMotor(PypvRecord):
         self.value = pos
 
         if self._check_limits(pos):
-            self._pos.move(pos, wait=False)
+            self._pos.move(pos, wait=False, timeout=self._timeout)
+        # TODO: does this not use put completion?
 
     def tweak_reverse(self, **kwargs):
         '''[CAS callback] CA client requested to tweak reverse'''
@@ -177,6 +180,17 @@ class PypvMotor(PypvRecord):
     def _move_done(self, **kwargs):
         '''[Pos callback] Positioner motion has completed'''
         self._update_status(moving=0)
+        self.async_done()
+        try:
+            self.value = self.move_status.target
+        except AttributeError:
+            pass
+        else:
+            self.move_status = None
+
+    def stop(self):
+        '''Stop the positioner'''
+        self._pos.stop()
 
     def _update_status(self, **kwargs):
         '''Update the motor status field (MSTA)'''

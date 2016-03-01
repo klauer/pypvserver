@@ -21,7 +21,6 @@ from pcaspy import cas
 from .alarms import (AlarmError, MajorAlarmError, MinorAlarmError, alarms)
 from .utils import record_field
 
-from .server import PypvServer
 from .errors import (AsyncCompletion, AsyncRunning, PypvError, PypvSuccess,
                      UndefinedValueError)
 
@@ -139,8 +138,8 @@ class PyPV(cas.casPV):
         A callback called when the value is written to via channel access. This
         overrides the default `written_to` method.
     scan_cb : callable, optional
-        A callback called when the scan event happens -- when the PV should have
-        its value updated. This overrides the default `scan` method.
+        A callback called when the scan event happens -- when the PV should
+        have its value updated. This overrides the default `scan` method.
     server : PypvServer, optional
         The channel access server to attach to
 
@@ -188,6 +187,8 @@ class PyPV(cas.casPV):
 
         if server is not None:
             name = server._strip_prefix(name)
+
+        from .server import PypvServer
 
         self._name = str(name)
         self._ca_type = PypvServer.type_map.get(type_, type_)
@@ -243,7 +244,8 @@ class PyPV(cas.casPV):
             self.major_states = list(major_states)
         elif self._ca_type in PypvServer.string_types:
             alarm_fcn = self._check_string
-        elif count > 0 or (type_ is np.ndarray and isinstance(value, np.ndarray)):
+        elif count > 0 or (type_ is np.ndarray and isinstance(value,
+                                                              np.ndarray)):
             try:
                 self._ca_type = PypvServer.type_map[value.dtype.type]
             except KeyError:
@@ -298,7 +300,7 @@ class PyPV(cas.casPV):
 
     def __getitem__(self, idx):
         if self._count <= 0:
-            raise IndexError('(%d) Not an array' % idx)
+            raise IndexError('(%s) Not an array' % idx)
         else:
             return self._value[idx]
 
@@ -333,7 +335,8 @@ class PyPV(cas.casPV):
             time.sleep(self._scan_rate)
 
     def touch(self):
-        '''Update the timestamp and alarm status (without changing the value)'''
+        '''Update the timestamp and alarm status (without changing the
+        value)'''
         self._timestamp = cas.epicsTimeStamp()
         self._status, self._severity = self.check_alarm()
 
@@ -405,7 +408,8 @@ class PyPV(cas.casPV):
 
     def _set_value(self, value, timestamp=None):
         if isinstance(value, cas.gdd):
-            info = self._gdd_to_dict(value)
+            gdd = value
+            info = self._gdd_to_dict(gdd)
 
             self._timestamp = info['timestamp']
             self._value = info['value']
@@ -422,14 +426,12 @@ class PyPV(cas.casPV):
             self._value = value
             self._status, self._severity = self.check_alarm()
 
-            if not self._interest:
-                return
-
             self._gdd_set_value(gdd)
 
+        if self._interest:
             # Notify clients of the update
             self.postEvent(self._mask, gdd)
-            self._mask = cas.DBE_VALUE | cas.DBE_LOG
+            # self._mask = cas.DBE_VALUE | cas.DBE_LOG
 
     value = property(_get_value, _set_value)
 
@@ -525,7 +527,8 @@ class PyPV(cas.casPV):
             except PypvError as ex:
                 return ex.ret
             except Exception as ex:
-                logger.debug('written_cb failed: (%s) %s' % (ex.__class__.__name__, ex),
+                logger.debug('written_cb failed: (%s) %s',
+                             ex.__class__.__name__, ex,
                              exc_info=ex)
                 # TODO: no error for rejected values?
                 return PypvSuccess.ret
@@ -647,9 +650,9 @@ class PypvRecord(PyPV):
         The record prefix
     val_field
         The default value for the value field
-    rtype : str, optional
-        The record type to use
-    desc : str, optional
+    rtype : str
+        The record type to report
+    desc : str
         The description field value
 
     Attributes
@@ -658,21 +661,15 @@ class PypvRecord(PyPV):
         Field name to PyPV instance
     '''
 
-    def __init__(self, name, val_field, rtype=None,
-                 desc='',
-                 **kwargs):
+    def __init__(self, name, val_field, rtype='', desc='', **kwargs):
         assert '.' not in name, 'Record name cannot have periods'
 
         PyPV.__init__(self, name, val_field, **kwargs)
 
         self.fields = {}
         self.add_field('VAL', None, pv=self)
-
-        if rtype is not None:
-            self.add_field('RTYP', str(rtype))
-
-        if desc is not None:
-            self.add_field('DESC', str(desc))
+        self.add_field('RTYP', str(rtype))
+        self.add_field('DESC', str(desc))
 
     def field_pvname(self, field):
         return record_field(self.name, field)

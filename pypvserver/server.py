@@ -18,6 +18,7 @@ from pcaspy import cas
 
 from .utils import split_record_field
 from .errors import PVNotFoundError
+from .pv import PypvRecord
 
 logger = logging.getLogger(__name__)
 
@@ -138,7 +139,9 @@ class PypvServer(cas.caServer):
             record, field = split_record_field(pv)
             if record in self._pvs:
                 rec = self._pvs[record]
-                return rec[field]
+                if isinstance(rec, PypvRecord):
+                    return rec[field]
+                raise KeyError('Field of a non-record')
 
         return self._pvs[pv]
 

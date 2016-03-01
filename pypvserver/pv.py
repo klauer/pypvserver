@@ -21,7 +21,6 @@ from pcaspy import cas
 from .alarms import (AlarmError, MajorAlarmError, MinorAlarmError, alarms)
 from .utils import record_field
 
-from .server import PypvServer
 from .errors import (AsyncCompletion, AsyncRunning, PypvError, PypvSuccess,
                      UndefinedValueError)
 
@@ -189,6 +188,8 @@ class PyPV(cas.casPV):
         if server is not None:
             name = server._strip_prefix(name)
 
+        from .server import PypvServer
+
         self._name = str(name)
         self._ca_type = PypvServer.type_map.get(type_, type_)
         self._precision = precision
@@ -299,7 +300,7 @@ class PyPV(cas.casPV):
 
     def __getitem__(self, idx):
         if self._count <= 0:
-            raise IndexError('(%d) Not an array' % idx)
+            raise IndexError('(%s) Not an array' % idx)
         else:
             return self._value[idx]
 
@@ -649,9 +650,9 @@ class PypvRecord(PyPV):
         The record prefix
     val_field
         The default value for the value field
-    rtype : str, optional
-        The record type to use
-    desc : str, optional
+    rtype : str
+        The record type to report
+    desc : str
         The description field value
 
     Attributes
@@ -660,21 +661,15 @@ class PypvRecord(PyPV):
         Field name to PyPV instance
     '''
 
-    def __init__(self, name, val_field, rtype=None,
-                 desc='',
-                 **kwargs):
+    def __init__(self, name, val_field, rtype='', desc='', **kwargs):
         assert '.' not in name, 'Record name cannot have periods'
 
         PyPV.__init__(self, name, val_field, **kwargs)
 
         self.fields = {}
         self.add_field('VAL', None, pv=self)
-
-        if rtype is not None:
-            self.add_field('RTYP', str(rtype))
-
-        if desc is not None:
-            self.add_field('DESC', str(desc))
+        self.add_field('RTYP', str(rtype))
+        self.add_field('DESC', str(desc))
 
     def field_pvname(self, field):
         return record_field(self.name, field)
